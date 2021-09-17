@@ -1,0 +1,72 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-dev --no-suggest --optimize-autoloader
+
+      - name: Cache pnpm modules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-pnpm-modules
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ matrix.node-version }}-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-${{ matrix.node-version }}-
+
+      - uses: pnpm/action-setup@v1.2.1
+        with:
+          version: 5.17.2
+          run_install: true
+          
+      - name: Compile assets
+        run: pnpm run production
+
+      - name: Clean node modules
+        run: rm -rf node_modules
+
+      - name: WordPress Plugin SVN Deploy
+        uses: nk-o/action-wordpress-plugin-deploy@master
+        env:
+          SVN_USERNAME: ${{ secrets.WORDPRESS_SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.WORDPRESS_SVN_PASSWORD }}
+          SLUG: asura-connector
+
+      - name: Create zip
+        uses: montudor/action-zip@v0.1.1
+        with:
+          args: zip -qq -r "connector-${{ steps.get_version.outputs.VERSION }}.zip" . -x *.git* node_modules/\* pnpm-lock.yaml composer.lock
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+
+      - name: Upload zip to release
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./connector-${{ steps.get_version.outputs.VERSION }}.zip
+          asset_name: connector-${{ steps.get_version.outputs.VERSION }}.zip
+          asset_content_type: application/zip

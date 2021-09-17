@@ -1,0 +1,18 @@
+{
+    "name": "dplugins/asura-connector",
+    "require": {
+        "php": "^7.4|^8.0",
+        "guzzlehttp/guzzle": "^7.3",
+        "catfan/medoo": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dplugins\\Asura\\Connector\\": "app/"
+        },
+        "classmap": [
+            "database/migrations/"
+        ]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
